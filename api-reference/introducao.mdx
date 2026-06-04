@@ -1,0 +1,43 @@
+---
+title: "Introdução"
+description: "URLs base, autenticação, formato de resposta e limites da API da Ephra."
+---
+
+A API da Ephra é REST, troca JSON e usa autenticação por Bearer token. Esta seção é a referência técnica das rotas. Para conceitos e tutoriais, veja os [Guias](/index).
+
+## URLs base
+
+| Ambiente | URL base |
+| --- | --- |
+| Produção | `https://api.ephra.io` |
+| Local (desenvolvimento) | `http://localhost:3001` |
+
+## Autenticação
+
+Toda rota `/v1/*` exige o header `Authorization: Bearer <token>`. O token é obtido em [`POST /auth`](/api-reference/autenticacao). Apenas o login não exige Bearer.
+
+## Formato de resposta
+
+As respostas de sucesso seguem o envelope padrão:
+
+```json
+{ "success": true, "message": "...", "data": { } }
+```
+
+## Valores monetários
+
+Todos os valores são **inteiros, em centavos**. `amountInCents: 10000` equivale a R$ 100,00. As taxas em `fees` também vêm em centavos.
+
+## Limite de requisições
+
+O limite é de **1000 requisições por minuto** por origem. Ao exceder, você recebe `429 Too Many Requests`.
+
+## Erros
+
+Erros retornam um corpo com `statusCode`, `error` e `message`:
+
+```json
+{ "statusCode": 400, "error": "Bad Request", "message": "Documento inválido para o tipo selecionado" }
+```
+
+Veja a lista completa em [Status e erros](/api-reference/status-e-erros).

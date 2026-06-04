@@ -1,0 +1,68 @@
+---
+title: "Status e erros"
+description: "Referência dos status de transação, métodos de pagamento e códigos de erro."
+---
+
+## Status de transação
+
+| Status | Significado |
+| --- | --- |
+| `pending` | Aguardando pagamento. |
+| `paid` | Pago. |
+| `refused` | Recusado. |
+| `canceled` | Cancelado. |
+| `refund` | Estornado. |
+| `chargeback` | Chargeback aberto. |
+| `contest` | Em contestação. |
+| `infraction` | Em análise de infração/fraude. |
+| `expired` | Expirado (PIX). |
+| `error` | Erro de processamento. |
+| `waiting` | Aguardando ação assíncrona. |
+
+<Note>
+  O PIX sempre nasce `pending` e passa a `paid` via webhook do adquirente. O cartão pode nascer `paid`, `refused` ou `pending` (quando o adquirente confirma de forma assíncrona).
+</Note>
+
+## Métodos de pagamento
+
+| Valor | Método |
+| --- | --- |
+| `pix` | PIX |
+| `credit_card` | Cartão de crédito |
+| `boleto` | Boleto |
+
+## Códigos de erro
+
+Erros seguem o formato:
+
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "Documento inválido para o tipo selecionado"
+}
+```
+
+| Código | Significado | Causas comuns |
+| --- | --- | --- |
+| `400` | Bad Request | Corpo inválido, documento (CPF/CNPJ) inválido, soma de `items` diferente de `amountInCents`. |
+| `401` | Unauthorized | Credenciais inválidas, token ausente, expirado ou com sessão encerrada. |
+| `403` | Forbidden | Acesso negado ao recurso. |
+| `404` | Not Found | Recurso não encontrado. |
+| `409` | Conflict | Conflito de estado (ex.: recurso duplicado). |
+| `429` | Too Many Requests | Mais de 1000 requisições por minuto a partir da mesma origem. |
+| `503` | Service Unavailable | Serviço temporariamente indisponível. |
+
+## Motivos de recusa de cartão
+
+O campo `refuseReason` (presente em respostas e webhooks de cartão recusado) pode conter:
+
+| Valor | Significado |
+| --- | --- |
+| `INSUFFICIENT_FUNDS` | Saldo insuficiente |
+| `CARD_BLOCKED` | Cartão bloqueado |
+| `INVALID_DATA` | Dados incorretos |
+| `TIMEOUT` | Tempo esgotado |
+| `EXPIRED_CARD` | Cartão expirado |
+| `ANTIFRAUD_REJECTED` | Reprovado por antifraude |
+| `OTHER` | Transação recusada (motivo genérico) |

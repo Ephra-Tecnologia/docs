@@ -1,0 +1,136 @@
+---
+title: "Eventos e payload"
+description: "Todos os eventos de webhook e o formato do payload de transação."
+---
+
+## Eventos disponíveis
+
+Informe os eventos que quer receber no campo `events` ao [cadastrar o webhook](/api-reference/webhooks).
+
+| Evento | Dispara quando |
+| --- | --- |
+| `transaction_created` | A transação é criada (o PIX nasce aqui, ainda `pending`). |
+| `transaction_paid` | O pagamento é **confirmado** (`paid`). É o evento principal. |
+| `transaction_refunded` | Um estorno é processado. |
+| `transaction_updated` | Mudança genérica de status (ex.: passa a `refused`). |
+| `transfer_created` | Uma transferência/saque é iniciada. |
+| `transfer_completed` | A transferência é concluída. |
+| `transfer_canceled` | A transferência é cancelada. |
+| `transfer_updated` | A transferência muda de status. |
+| `infraction` | Uma infração, MED ou disputa é registrada. |
+| `card_declined` | Um cartão é recusado pelo processador. |
+| `sale_lost` | Um PIX criado não é pago após cerca de 1 hora. |
+| `cart_abandoned` | Um carrinho não é convertido. |
+| `product_canceled` | Uma assinatura ou produto é cancelado. |
+
+## Payload de transação
+
+Os eventos de transação (`transaction_created`, `transaction_paid`, `transaction_refunded`, `transaction_updated`) enviam o mesmo formato. Exemplo de um `transaction_paid` — o que você recebe quando um PIX é pago:
+
+```json
+{
+  "id": "9f1c8e2a-...-uuid",
+  "type": "transaction",
+  "event": "transaction_paid",
+  "scope": "user",
+  "transaction": {
+    "id": "clxabc123def456",
+    "amount": 10000,
+    "status": "paid",
+    "pix": {
+      "endToEndId": "E12345678202606031200abcdef0001",
+      "payerInfo": { "name": "Maria Silva", "cpf": "***456789**" }
+    }
+  },
+  "customer": {
+    "email": "maria@email.com",
+    "name": "Maria Silva",
+    "phone": "+5511999998888",
+    "document": "12345678909",
+    "documentType": "cpf",
+    "purchaseDate": "2026-06-03T12:00:00.000Z"
+  },
+  "product": { "id": "clx...", "name": "Produto A", "amount": 10000 },
+  "company": { "name": "Loja X", "document": "11222333000181", "documentType": "cnpj" },
+  "sale": {
+    "type": "one_time",
+    "subscriptionInterval": null,
+    "renewalType": null,
+    "mainOfferId": null,
+    "orderBumpIds": [],
+    "orderBumpOfferIds": []
+  }
+}
+```
+
+### Campos
+
+<ResponseField name="id" type="string">
+  UUID **da entrega** (não é o ID da transação). O ID da transação está em `transaction.id`.
+</ResponseField>
+
+<ResponseField name="event" type="string">
+  Nome do evento. Use este campo para rotear o tratamento no seu lado.
+</ResponseField>
+
+<ResponseField name="scope" type="string">
+  Origem do webhook: `user` (webhook que você cadastrou), `system` ou `postback`.
+</ResponseField>
+
+<ResponseField name="transaction" type="object">
+  Bloco da transação.
+
+  <Expandable title="propriedades de transaction">
+    <ResponseField name="transaction.id" type="string">
+      ID da transação.
+    </ResponseField>
+    <ResponseField name="transaction.amount" type="number">
+      Valor, em centavos.
+    </ResponseField>
+    <ResponseField name="transaction.status" type="string">
+      Status atual: `pending`, `paid`, `refused`, etc.
+    </ResponseField>
+    <ResponseField name="transaction.refuseReason" type="string">
+      Motivo da recusa. Presente apenas quando existe.
+    </ResponseField>
+    <ResponseField name="transaction.acquirerCode" type="string">
+      Código do adquirente. Presente apenas quando existe.
+    </ResponseField>
+    <ResponseField name="transaction.acquirerMessage" type="string">
+      Mensagem do adquirente. Presente apenas quando existe.
+    </ResponseField>
+    <ResponseField name="transaction.pix" type="object">
+      Dados do PIX (`endToEndId`, `payerInfo`). Presente quando a transação é PIX.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Dados do cliente. Presente nos eventos de transação.
+</ResponseField>
+
+<ResponseField name="product" type="object">
+  Dados do produto. Presente quando a transação está vinculada a um produto.
+</ResponseField>
+
+<ResponseField name="company" type="object">
+  Dados da empresa: `name`, `document`, `documentType`.
+</ResponseField>
+
+<ResponseField name="sale" type="object">
+  Metadados da venda: tipo (`one_time` ou `recurring`), intervalo de assinatura, ofertas e order bumps.
+</ResponseField>
+
+## Ciclo de status de um PIX
+
+<Steps>
+  <Step title="transaction_created">
+    Você cria a cobrança e recebe este evento quase imediatamente, com `status: "pending"`.
+  </Step>
+  <Step title="transaction_paid">
+    O cliente paga e você recebe este evento com `status: "paid"`. Este é o gatilho para liberar o pedido.
+  </Step>
+  <Step title="transaction_refunded (eventual)">
+    Caso haja estorno, você recebe este evento depois.
+  </Step>
+</Steps>

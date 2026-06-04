@@ -1,0 +1,48 @@
+---
+title: "Pagamentos PIX"
+description: "Como funcionam as cobranças PIX: os dois tipos, o que o cliente recebe e o ciclo de status até o pago."
+---
+
+O PIX é a forma mais rápida de receber: o cliente paga em segundos e você é avisado por [webhook](/guias/webhooks). Toda cobrança PIX nasce com status `pending` e passa a `paid` quando o pagamento é confirmado.
+
+## Dois tipos de cobrança
+
+<CardGroup cols={2}>
+  <Card title="PIX imediato" icon="bolt">
+    QR Code dinâmico avulso, **sem vencimento**. Ideal para checkout: o cliente paga agora.
+  </Card>
+  <Card title="PIX com vencimento" icon="calendar">
+    Cobrança com **data de vencimento**, multa, juros e desconto. Ideal para faturas e boletos.
+  </Card>
+</CardGroup>
+
+Os dois retornam o mesmo par de campos para o cliente pagar:
+
+- **`emv`** — o código "copia e cola" (BR Code).
+- **`qrCode`** — a imagem PNG do QR Code, em base64, pronta para exibir.
+
+## O que acontece depois de criar
+
+<Steps>
+  <Step title="Você cria a cobrança">
+    A API responde com `status: "pending"` e o `id` da transação. Guarde esse `id`.
+  </Step>
+  <Step title="O cliente paga">
+    Ele usa o `emv` ou lê o QR Code no app do banco.
+  </Step>
+  <Step title="Você recebe o webhook">
+    Chega um `transaction_paid` com `status: "paid"`. **Esse é o gatilho** para liberar o pedido — não confie apenas na resposta da criação.
+  </Step>
+</Steps>
+
+<Note>
+  Valores são sempre em **centavos**: `amountInCents: 10000` equivale a R$ 100,00.
+</Note>
+
+<Tip>
+  Um PIX criado e não pago dispara o evento `sale_lost` após cerca de 1 hora — útil para recuperação de carrinho.
+</Tip>
+
+<Card title="Referência: rotas PIX" icon="code" href="/api-reference/pix">
+  Corpo completo da requisição, campos de `customer`, regras de `cob` (vencimento) e respostas.
+</Card>

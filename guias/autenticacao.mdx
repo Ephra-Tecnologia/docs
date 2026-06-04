@@ -1,0 +1,51 @@
+---
+title: "Autenticação"
+description: "Entenda o modelo de credenciais da Ephra: a API key de longo prazo e o token de acesso de curta duração."
+---
+
+A Ephra usa **duas credenciais com papéis diferentes**. Entender a distinção evita os erros `401` mais comuns.
+
+<CardGroup cols={2}>
+  <Card title="API key" icon="key">
+    Sua credencial **permanente** (`public` + `secret`), gerada uma vez no painel. Serve apenas para fazer login.
+  </Card>
+  <Card title="Token de acesso" icon="ticket">
+    Um **Bearer token de curta duração**, obtido a cada login. É ele que autoriza as chamadas `/v1/*`.
+  </Card>
+</CardGroup>
+
+## Por que duas credenciais?
+
+A API key é o seu segredo de longo prazo — como uma senha mestra: quase nunca muda e deve ficar guardada no servidor. Mandar esse segredo em toda requisição seria arriscado, então você o troca por um **token temporário**. Se um token vazar, ele expira sozinho em pouco tempo.
+
+<Warning>
+  O `secret` da API key só aparece **uma vez**, no momento da criação. Guarde-o num cofre de segredos. Se perder, gere uma nova chave.
+</Warning>
+
+## Ciclo de vida do token
+
+<Steps>
+  <Step title="Login">
+    Você envia a API key (via HTTP Basic) para `POST /auth` e recebe um token.
+  </Step>
+  <Step title="Uso">
+    Inclui o token no header `Authorization: Bearer <token>` de cada chamada `/v1/*`.
+  </Step>
+  <Step title="Expiração">
+    O token vale pelo tempo indicado em `expiresIn` (em milissegundos). Depois disso, você faz login de novo.
+  </Step>
+</Steps>
+
+<Note>
+  Cada login abre uma **sessão**. Um token cuja sessão não existe mais é rejeitado com `401`, mesmo que ainda não tenha expirado. Reaproveite o mesmo token enquanto ele for válido, em vez de logar a cada chamada.
+</Note>
+
+## Boas práticas
+
+- Faça login **uma vez** e reutilize o token até perto de `expiresIn`.
+- Trate `401` como sinal para refazer o login e repetir a chamada.
+- Nunca exponha o `secret` no front-end — toda chamada autenticada sai do seu back-end.
+
+<Card title="Referência: POST /auth" icon="code" href="/api-reference/autenticacao">
+  Parâmetros, headers e formato de resposta da rota de login.
+</Card>

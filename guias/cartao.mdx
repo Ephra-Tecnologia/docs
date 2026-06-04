@@ -1,0 +1,41 @@
+---
+title: "Pagamentos no cartão"
+description: "Como cobrar no cartão com segurança: tokenização, parcelas e tratamento de recusas."
+---
+
+A cobrança no cartão tem **dois passos**, e essa separação existe por segurança: os dados sensíveis do cartão nunca passam pela rota de cobrança.
+
+<Steps>
+  <Step title="Tokenizar" icon="lock">
+    Você envia número, validade e CVV para a rota de tokenização e recebe um `cardToken` opaco.
+  </Step>
+  <Step title="Cobrar" icon="credit-card">
+    Você cria a cobrança usando **apenas o `cardToken`** — nunca o número do cartão.
+  </Step>
+</Steps>
+
+<Warning>
+  Nunca envie número do cartão ou CVV para a rota de cobrança. Esses dados só trafegam na tokenização. Isso reduz seu escopo de PCI e o risco de vazamento.
+</Warning>
+
+## Parcelamento
+
+Você pode cobrar em **1 a 12 parcelas** (`installments`). O padrão é 1 (à vista).
+
+## O resultado pode vir na hora
+
+Diferente do PIX (que sempre nasce `pending`), o cartão costuma **resolver de imediato**. A resposta da cobrança já vem com um status:
+
+| Status | O que significa |
+| --- | --- |
+| `paid` | Aprovado. |
+| `refused` | Recusado — veja o `refuseReason`. |
+| `pending` | O adquirente confirma de forma assíncrona; o resto chega por webhook. |
+
+## Quando é recusado
+
+O campo `refuseReason` diz o motivo (saldo insuficiente, cartão bloqueado, antifraude, etc.) e o campo `message` já vem traduzido para exibir ao usuário. Trate a recusa oferecendo outro cartão ou o PIX como alternativa.
+
+<Card title="Referência: rotas de cartão" icon="code" href="/api-reference/cartao">
+  Tokenização, cobrança, parcelas e a tabela completa de motivos de recusa.
+</Card>

@@ -1,0 +1,100 @@
+---
+title: "Autenticação"
+description: "POST /auth — troque sua API key por um token de acesso Bearer."
+---
+
+<Info>
+  Visão conceitual do modelo de credenciais em [Guias › Autenticação](/guias/autenticacao).
+</Info>
+
+A autenticação usa duas credenciais distintas:
+
+1. **API key** (`public` + `secret`) — sua credencial de longo prazo, gerada uma vez no painel.
+2. **Token de acesso** (Bearer) — obtido a cada chamada de login com a API key. Vai no header de toda rota `/v1/*`.
+
+## Obter a API key
+
+A API key é emitida no painel da sua empresa. Ao gerá-la, você recebe:
+
+```json
+{
+  "success": true,
+  "data": {
+    "accountId": "ckxxxx...",
+    "public": "pk_live_xxxxxxxxxxxx",
+    "secret": "sk_live_yyyyyyyyyyyy"
+  }
+}
+```
+
+<Warning>
+  O `secret` só é exibido no momento da criação. Guarde-o com segurança — não há como recuperá-lo depois, apenas gerar uma nova chave.
+</Warning>
+
+## Obter o token de acesso
+
+```http
+POST /auth
+```
+
+A rota de login usa **HTTP Basic Auth**: o header `Authorization` carrega `Basic base64("<public>:<secret>")`. Com cURL, a flag `-u` monta esse header automaticamente.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.ephra.io/auth \
+  -u "pk_live_xxxxxxxxxxxx:sk_live_yyyyyyyyyyyy"
+```
+
+```js Node
+const credentials = Buffer.from(`${PUBLIC}:${SECRET}`).toString("base64")
+
+const res = await fetch("https://api.ephra.io/auth", {
+  method: "POST",
+  headers: { Authorization: `Basic ${credentials}` },
+})
+const { token } = await res.json()
+```
+</CodeGroup>
+
+**Resposta**
+
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tokenType": "Bearer",
+  "expiresIn": 60000
+}
+```
+
+<ResponseField name="token" type="string">
+  O token de acesso. Use-o como `Authorization: Bearer <token>`.
+</ResponseField>
+
+<ResponseField name="tokenType" type="string">
+  Sempre `Bearer`.
+</ResponseField>
+
+<ResponseField name="expiresIn" type="number">
+  Validade do token, em milissegundos.
+</ResponseField>
+
+<Note>
+  Os tokens têm vida curta. Gere um novo token antes de iniciar suas operações e reutilize-o apenas enquanto estiver dentro da validade indicada em `expiresIn`. Cada login registra uma sessão; um token cuja sessão não exista mais é rejeitado com `401`.
+</Note>
+
+## Usar o token
+
+Inclua o token no header `Authorization` de toda chamada `/v1/*`:
+
+```bash
+curl https://api.ephra.io/v1/transactions \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Erros comuns
+
+| Código | Quando acontece |
+| --- | --- |
+| `401` | Credenciais inválidas no login, ou token ausente, expirado ou com sessão encerrada. |
+| `429` | Mais de 1000 requisições por minuto a partir da mesma origem. |

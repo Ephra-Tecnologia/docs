@@ -1,0 +1,183 @@
+---
+title: "Cobrança no cartão"
+description: "POST /v1/card-token e POST /v1/card — tokenize o cartão e crie uma cobrança em até 12 parcelas."
+---
+
+<Info>
+  Visão conceitual (segurança, parcelas, recusas) em [Guias › Pagamentos no cartão](/guias/cartao).
+</Info>
+
+A cobrança no cartão tem dois passos: primeiro você **tokeniza** os dados sensíveis do cartão e, em seguida, **cobra** usando o token.
+
+<Warning>
+  Nunca envie número do cartão ou CVV para a rota de cobrança. Esses dados só trafegam na rota de tokenização. Na cobrança, use apenas o `cardToken`.
+</Warning>
+
+## 1. Tokenizar o cartão
+
+```http
+POST /v1/card-token
+```
+
+### Corpo da requisição
+
+<ParamField body="number" type="string" required>
+  Número do cartão. Validado pelo algoritmo de Luhn; espaços e máscara são removidos automaticamente.
+</ParamField>
+
+<ParamField body="holderName" type="string" required>
+  Nome impresso no cartão.
+</ParamField>
+
+<ParamField body="expirationMonth" type="string" required>
+  Mês de validade, de `01` a `12`.
+</ParamField>
+
+<ParamField body="expirationYear" type="string" required>
+  Ano de validade, com 2 ou 4 dígitos (`28` é interpretado como `2028`).
+</ParamField>
+
+<ParamField body="cvv" type="string" required>
+  Código de segurança, com 3 ou 4 dígitos.
+</ParamField>
+
+### Exemplo
+
+```bash
+curl -X POST https://api.ephra.io/v1/card-token \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "number": "4111111111111111",
+    "holderName": "MARIA SILVA",
+    "expirationMonth": "07",
+    "expirationYear": "28",
+    "cvv": "123"
+  }'
+```
+
+### Resposta
+
+```json
+{ "success": true, "token": "tok_abc123..." }
+```
+
+Use o `token` retornado no campo `card.cardToken` da cobrança.
+
+## 2. Cobrar no cartão
+
+```http
+POST /v1/card
+```
+
+### Corpo da requisição
+
+<ParamField body="amountInCents" type="integer" required>
+  Valor da cobrança, em centavos.
+</ParamField>
+
+<ParamField body="card" type="object" required>
+  <Expandable title="propriedades de card">
+    <ParamField body="card.cardToken" type="string" required>
+      Token obtido em `POST /v1/card-token`.
+    </ParamField>
+    <ParamField body="card.installments" type="integer">
+      Número de parcelas, de 1 a 12. O padrão é 1.
+    </ParamField>
+    <ParamField body="card.holderName" type="string">
+      Nome do titular.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="customer" type="object" required>
+  Dados do cliente. Mesma estrutura do [PIX](/api-reference/pix#corpo-da-requisicao): `documentType`, `document`, `name`, `email`, `phone`.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Descrição da cobrança.
+</ParamField>
+
+<ParamField body="postbackUrl" type="string">
+  URL que recebe os webhooks apenas desta transação.
+</ParamField>
+
+<ParamField body="seller" type="object">
+  Dados do vendedor (opcional).
+</ParamField>
+
+<ParamField body="items" type="array">
+  Itens da cobrança (opcional). Mesma regra de soma do PIX.
+</ParamField>
+
+### Exemplo
+
+```bash
+curl -X POST https://api.ephra.io/v1/card \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountInCents": 10000,
+    "description": "Pedido #1234",
+    "card": { "cardToken": "tok_abc123...", "installments": 1 },
+    "customer": {
+      "name": "Maria Silva",
+      "email": "maria@email.com",
+      "documentType": "cpf",
+      "document": "12345678909"
+    }
+  }'
+```
+
+### Resposta
+
+<Tabs>
+  <Tab title="Aprovado">
+    ```json
+    {
+      "success": true,
+      "message": "Transação aprovada",
+      "data": {
+        "id": "clx...",
+        "card": { "token": "tok_abc123...", "brand": "MASTERCARD", "last4": "1111" },
+        "status": "paid",
+        "fees": 175
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Recusado">
+    ```json
+    {
+      "success": true,
+      "message": "Saldo insuficiente",
+      "data": {
+        "id": "clx...",
+        "card": { "token": "tok_abc123...", "brand": "MASTERCARD", "last4": "1111" },
+        "status": "refused",
+        "refuseReason": "INSUFFICIENT_FUNDS",
+        "acquirerCode": "02",
+        "acquirerMessage": "Saldo insuficiente"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Diferente do PIX (que sempre nasce `pending` e vira `paid` por webhook), o cartão pode resolver na hora: a resposta vem `paid`, `refused` ou `pending` (quando o adquirente confirma de forma assíncrona). O campo `message` já vem traduzido.
+</Note>
+
+### Motivos de recusa
+
+O campo `refuseReason` pode conter:
+
+| Valor | Significado |
+| --- | --- |
+| `INSUFFICIENT_FUNDS` | Saldo insuficiente |
+| `CARD_BLOCKED` | Cartão bloqueado |
+| `INVALID_DATA` | Dados incorretos |
+| `TIMEOUT` | Tempo esgotado |
+| `EXPIRED_CARD` | Cartão expirado |
+| `ANTIFRAUD_REJECTED` | Reprovado por antifraude |
+| `OTHER` | Transação recusada (motivo genérico) |

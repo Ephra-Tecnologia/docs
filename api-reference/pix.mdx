@@ -1,0 +1,209 @@
+---
+title: "Cobrança PIX"
+description: "POST /v1/pix/in/qrcode e POST /v1/pix/in/cob — gere um QR Code imediato ou uma cobrança com vencimento."
+---
+
+<Info>
+  Visão conceitual e quando usar cada tipo em [Guias › Pagamentos PIX](/guias/pix).
+</Info>
+
+Há duas formas de criar uma cobrança PIX. Ambas retornam o mesmo formato (`emv` + `qrCode`) e nascem com `status: "pending"`. A confirmação de pagamento chega por [webhook](/api-reference/eventos).
+
+| Rota | Tipo | Quando usar |
+| --- | --- | --- |
+| `POST /v1/pix/in/qrcode` | PIX imediato | QR Code dinâmico avulso, sem vencimento |
+| `POST /v1/pix/in/cob` | PIX com vencimento | Cobrança com data de vencimento, multa, juros e desconto |
+
+## PIX imediato
+
+```http
+POST /v1/pix/in/qrcode
+```
+
+### Corpo da requisição
+
+<ParamField body="amountInCents" type="integer" required>
+  Valor da cobrança, em centavos. Deve ser maior que zero.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Descrição livre da cobrança.
+</ParamField>
+
+<ParamField body="postbackUrl" type="string">
+  URL que receberá os webhooks apenas desta transação, sem precisar cadastrar um webhook permanente.
+</ParamField>
+
+<ParamField body="customer" type="object" required>
+  Dados do pagador.
+
+  <Expandable title="propriedades de customer">
+    <ParamField body="customer.documentType" type="string" required>
+      `cpf` ou `cnpj`.
+    </ParamField>
+    <ParamField body="customer.document" type="string" required>
+      CPF ou CNPJ do pagador. É validado (precisa ser um documento real).
+    </ParamField>
+    <ParamField body="customer.name" type="string">
+      Nome do pagador.
+    </ParamField>
+    <ParamField body="customer.email" type="string">
+      E-mail do pagador. Validado como e-mail.
+    </ParamField>
+    <ParamField body="customer.phone" type="string">
+      Telefone do pagador.
+    </ParamField>
+    <ParamField body="customer.billingAddress" type="object">
+      Endereço de cobrança: `street`, `number`, `neighborhood`, `city`, `state`, `zipCode`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="seller" type="object">
+  Dados do vendedor (sub-seller): `name`, `documentType`, `document` e, opcionalmente, `phone` e `address`.
+</ParamField>
+
+<ParamField body="items" type="array">
+  Itens da cobrança. Cada item tem `title`, `tangible`, `quantity` e `amountInCents`.
+</ParamField>
+
+<Note>
+  Se você enviar `items`, o `amountInCents` da cobrança deve ser **igual** à soma de `amountInCents × quantity` de cada item. Caso contrário, a API retorna `400`.
+</Note>
+
+### Exemplo
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.ephra.io/v1/pix/in/qrcode \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountInCents": 10000,
+    "description": "Pedido #1234",
+    "customer": {
+      "name": "Maria Silva",
+      "email": "maria@email.com",
+      "documentType": "cpf",
+      "document": "12345678909"
+    }
+  }'
+```
+
+```js Node
+const res = await fetch("https://api.ephra.io/v1/pix/in/qrcode", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    amountInCents: 10000,
+    description: "Pedido #1234",
+    customer: {
+      name: "Maria Silva",
+      email: "maria@email.com",
+      documentType: "cpf",
+      document: "12345678909",
+    },
+  }),
+})
+const { data } = await res.json()
+```
+</CodeGroup>
+
+### Resposta
+
+```json
+{
+  "success": true,
+  "message": "Transação criada com sucesso",
+  "data": {
+    "id": "clxabc123def456",
+    "pix": {
+      "emv": "00020126580014br.gov.bcb.pix...6304ABCD",
+      "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+    },
+    "status": "pending",
+    "fees": 150
+  }
+}
+```
+
+<ResponseField name="data.id" type="string">
+  ID da transação. Guarde-o para consultar o status e correlacionar o webhook.
+</ResponseField>
+
+<ResponseField name="data.pix.emv" type="string">
+  Código "copia e cola" (BR Code) para o pagador.
+</ResponseField>
+
+<ResponseField name="data.pix.qrCode" type="string">
+  Imagem PNG do QR Code em base64, pronta para usar em `<img src="...">`.
+</ResponseField>
+
+<ResponseField name="data.status" type="string">
+  Status inicial. Para PIX, sempre `pending`.
+</ResponseField>
+
+<ResponseField name="data.fees" type="number">
+  Taxa da transação, em centavos.
+</ResponseField>
+
+## PIX com vencimento
+
+```http
+POST /v1/pix/in/cob
+```
+
+Aceita os mesmos campos do PIX imediato, mais o objeto `cob` com a data de vencimento e as regras de cobrança.
+
+<ParamField body="cob" type="object" required>
+  <Expandable title="propriedades de cob">
+    <ParamField body="cob.expirationDate" type="string" required>
+      Data de vencimento no formato `YYYY-MM-DD`.
+    </ParamField>
+    <ParamField body="cob.daysAfterDueDate" type="integer">
+      Dias após o vencimento em que o pagamento ainda é aceito.
+    </ParamField>
+    <ParamField body="cob.fine" type="object">
+      Multa por atraso: `{ "type": "percent" | "fixed", "value": number }`. Valores `fixed` em centavos.
+    </ParamField>
+    <ParamField body="cob.interest" type="object">
+      Juros: `{ "type", "basis": "day" | "month" | "year", "calendar": "calendar" | "business", "value" }`.
+    </ParamField>
+    <ParamField body="cob.discount" type="object">
+      Desconto por antecipação ou em datas fixas.
+    </ParamField>
+    <ParamField body="cob.rebate" type="object">
+      Abatimento: `{ "type", "value" }`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Exemplo
+
+```bash
+curl -X POST https://api.ephra.io/v1/pix/in/cob \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amountInCents": 10000,
+    "customer": { "name": "Maria Silva", "documentType": "cpf", "document": "12345678909" },
+    "cob": {
+      "expirationDate": "2026-07-01",
+      "daysAfterDueDate": 5,
+      "fine": { "type": "percent", "value": 2 },
+      "interest": { "type": "percent", "basis": "month", "calendar": "calendar", "value": 1 },
+      "discount": { "type": "fixed", "perAdvance": true, "calendar": "calendar", "value": 500 }
+    }
+  }'
+```
+
+A resposta tem o mesmo formato do PIX imediato.
+
+## Próximos passos
+
+<Card title="Receber a confirmação de pagamento" icon="bell" href="/api-reference/eventos">
+  Configure o webhook `transaction_paid` para saber quando o PIX for pago.
+</Card>

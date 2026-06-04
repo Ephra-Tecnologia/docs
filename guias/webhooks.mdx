@@ -1,0 +1,108 @@
+---
+title: "Webhooks"
+description: "Como receber notificações de pagamento em tempo real, validar a assinatura e construir um receptor confiável."
+---
+
+Em vez de ficar consultando a API, você **cadastra uma URL** e a Ephra avisa você toda vez que uma transação muda de estado. É assim que você descobre que um PIX foi pago.
+
+## O modelo
+
+<Steps>
+  <Step title="Cadastre um endpoint">
+    Registre uma URL HTTPS e os eventos que quer receber. Você recebe um `signatureSecret`.
+  </Step>
+  <Step title="Receba os POSTs">
+    A cada mudança de status, a Ephra faz um `POST` com o payload da transação no seu endpoint.
+  </Step>
+  <Step title="Confirme com 2xx">
+    Responda `2xx` rápido. Qualquer outra resposta entra em retentativa.
+  </Step>
+</Steps>
+
+<Tip>
+  Precisa de webhook só para uma cobrança específica? Informe `postbackUrl` no corpo daquela cobrança, sem cadastrar um webhook permanente.
+</Tip>
+
+## O evento principal: `transaction_paid`
+
+Para a maioria dos casos, o evento que importa é o `transaction_paid` (`status: "paid"`) — o gatilho para liberar o pedido. Há vários outros eventos (estorno, transferências, infrações); veja a lista completa em [Eventos e payload](/api-reference/eventos).
+
+## Valide a assinatura
+
+Todo webhook é assinado com **HMAC-SHA256** usando o `signatureSecret` do cadastro. O header de assinatura tem o formato:
+
+```
+t=<timestamp_ms>,v1=<hmac_sha256_hex>
+```
+
+O HMAC é calculado sobre `` `${timestamp}.${JSON.stringify(payload)}` ``. Recalcule com o seu segredo e compare:
+
+```js
+import crypto from "crypto"
+
+function validateSignature(signatureHeader, secret, payload) {
+  const [tsPart, v1Part] = signatureHeader.split(",")
+  const timestamp = tsPart.split("=")[1]
+  const received = v1Part.split("=")[1]
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.${JSON.stringify(payload)}`)
+    .digest("hex")
+
+  return expected === received
+}
+```
+
+<Tip>
+  Compare o `timestamp` com o horário atual e rejeite entregas muito antigas para evitar ataques de replay.
+</Tip>
+
+## Seja idempotente
+
+A mesma entrega pode chegar **mais de uma vez** (retentativa ou reenvio). Deduplique pelo `id` da entrega ou pela combinação `transaction.id` + `event`.
+
+```js
+import express from "express"
+
+const app = express()
+app.use(express.json())
+
+const processed = new Set() // em produção, use um armazenamento durável
+
+app.post("/webhooks/ephra", (req, res) => {
+  const { id, event, transaction } = req.body
+
+  if (processed.has(id)) return res.sendStatus(200) // idempotência
+  processed.add(id)
+
+  if (event === "transaction_paid" && transaction?.status === "paid") {
+    // libere o pedido referente a transaction.id
+  }
+
+  res.sendStatus(200) // responda 2xx rápido
+})
+
+app.listen(3000)
+```
+
+## Entrega e retentativas
+
+- **Timeout:** 60s. Sucesso = qualquer resposta `2xx`.
+- Até **3 retentativas** com backoff crescente (~8 min, 15 min e 30 min).
+- Só são retentadas entregas das **últimas 48 horas**; depois, a entrega é marcada como `failed`.
+
+Se o processamento for pesado, responda `200` na hora e processe em segundo plano.
+
+<Note>
+  Para valores altos, confirme o estado real com `GET /v1/transactions/{id}` antes de liberar o pedido. Veja [Consultar transação](/api-reference/transacoes).
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Referência: rotas de webhook" icon="code" href="/api-reference/webhooks">
+    Cadastrar, listar, remover e suprimir webhooks.
+  </Card>
+  <Card title="Referência: eventos e payload" icon="code" href="/api-reference/eventos">
+    Todos os eventos e o formato completo do payload.
+  </Card>
+</CardGroup>

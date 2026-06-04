@@ -1,47 +1,85 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Gere uma cobrança PIX e receba o webhook de pago, do início ao fim."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+Este guia leva você de zero a um PIX pago. Ao final, você terá autenticado, criado uma cobrança e recebido a confirmação de pagamento por webhook.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+## Pré-requisitos
 
-## Prerequisites
+Antes de começar, você precisa de:
 
-Before you begin, you must have:
+- Uma **API key** (`public` + `secret`), gerada no painel da sua empresa. Veja [Autenticação](/guias/autenticacao).
+- Um **endpoint público HTTPS** para receber os webhooks (pode ser um túnel local como ngrok durante os testes).
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+## Fluxo completo
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Autenticar">
+    Troque sua API key por um token de acesso. Use o token no header `Authorization` das próximas chamadas.
 
     ```bash
-    npm install your-package
+    TOKEN=$(curl -s -X POST https://api.ephra.io/auth \
+      -u "$PUBLIC:$SECRET" | jq -r .token)
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+  <Step title="Cadastrar o webhook (uma vez)">
+    Registre a URL que receberá as notificações. Guarde o `signatureSecret` retornado.
 
     ```bash
-    your-cli init
+    curl -s -X POST https://api.ephra.io/v1/webhook \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "url": "https://seusite.com/webhooks/ephra",
+        "events": ["transaction_created", "transaction_paid"]
+      }'
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+  <Step title="Criar a cobrança PIX">
+    Gere o QR Code. A resposta traz o `emv` (copia e cola) e o `qrCode` (imagem PNG em base64) para o cliente pagar.
 
     ```bash
-    your-cli start
+    curl -s -X POST https://api.ephra.io/v1/pix/in/qrcode \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "amountInCents": 10000,
+        "description": "Pedido #1234",
+        "customer": {
+          "name": "Maria Silva",
+          "email": "maria@email.com",
+          "documentType": "cpf",
+          "document": "12345678909"
+        }
+      }'
+    ```
+
+    A transação nasce com `status: "pending"`. Guarde o `data.id` para correlacionar o webhook.
+  </Step>
+  <Step title="Receber a confirmação">
+    Quando o cliente pagar, seu endpoint recebe um `POST` com `event: "transaction_paid"` e `transaction.status: "paid"`. Esse é o gatilho para liberar o pedido.
+
+    ```json
+    {
+      "event": "transaction_paid",
+      "transaction": { "id": "clxabc123def456", "amount": 10000, "status": "paid" }
+    }
     ```
   </Step>
 </Steps>
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  Você recebe `transaction_created` quase imediatamente (status `pending`) e `transaction_paid` quando o pagamento for confirmado. Trate seu endpoint de forma idempotente — deduplique pelo `transaction.id`.
 </Tip>
+
+## Próximos passos
+
+<CardGroup cols={2}>
+  <Card title="Cobrança no cartão" icon="credit-card" href="/guias/cartao">
+    Tokenize o cartão e cobre em até 12 parcelas.
+  </Card>
+  <Card title="Entender os webhooks" icon="bell" href="/guias/webhooks">
+    Conheça o modelo de eventos, validação de assinatura e idempotência.
+  </Card>
+</CardGroup>
