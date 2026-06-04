@@ -1,0 +1,10 @@
+---
+title: "Criar cobrança PIX (com vencimento)"
+openapi: "POST /v1/pix/in/cob"
+---
+
+Gera uma cobrança PIX **com data de vencimento**, multa, juros e desconto — ideal para faturas. Aceita os mesmos campos do QR Code imediato, mais o objeto `cob`. A cobrança nasce com `status: "pending"`.
+
+<Info>
+  Visão conceitual em [Guias › Pagamentos PIX](/guias/pix).
+</Info>

@@ -1,0 +1,69 @@
+---
+title: "Glossário"
+description: "Termos técnicos usados na documentação da Ephra."
+icon: "book"
+---
+
+<ResponseField name="API key" type="public + secret">
+  Credencial de longo prazo da sua empresa, gerada no painel. Usada para obter o token de acesso. Veja [Autenticação](/guias/autenticacao).
+</ResponseField>
+
+<ResponseField name="Token de acesso (Bearer)" type="JWT">
+  Credencial de curta duração obtida no login, enviada no header `Authorization` de cada chamada `/v1/*`.
+</ResponseField>
+
+<ResponseField name="amountInCents" type="integer">
+  Valor monetário em centavos. `10000` = R$ 100,00.
+</ResponseField>
+
+<ResponseField name="EMV / BR Code" type="string">
+  O código "copia e cola" do PIX. O cliente cola no app do banco para pagar. Retornado no campo `pix.emv`.
+</ResponseField>
+
+<ResponseField name="QR Code" type="string (base64)">
+  Imagem PNG (em base64) que representa o BR Code, pronta para exibir. Retornada em `pix.qrCode`.
+</ResponseField>
+
+<ResponseField name="endToEndId (E2E)" type="string">
+  Identificador único de um pagamento PIX na rede do Banco Central. Aparece no payload do webhook quando o PIX é pago.
+</ResponseField>
+
+<ResponseField name="payerInfo" type="object">
+  Dados de quem efetuou o pagamento PIX (nome, documento), retornados no webhook após a confirmação.
+</ResponseField>
+
+<ResponseField name="cardToken" type="string">
+  Token opaco que representa um cartão, gerado em `POST /v1/card-token`. Usado na cobrança no lugar dos dados do cartão.
+</ResponseField>
+
+<ResponseField name="cob / cobv" type="PIX">
+  `cob` é a cobrança PIX imediata; `cobv` é a cobrança PIX com vencimento (com multa, juros e desconto).
+</ResponseField>
+
+<ResponseField name="fees" type="integer">
+  Taxa da transação, em centavos.
+</ResponseField>
+
+<ResponseField name="netAmount" type="integer">
+  Valor líquido que entra para a sua empresa após as taxas, em centavos.
+</ResponseField>
+
+<ResponseField name="postbackUrl" type="string (URL)">
+  URL informada no corpo de uma cobrança para receber os webhooks somente daquela transação.
+</ResponseField>
+
+<ResponseField name="signatureSecret" type="string">
+  Segredo de um webhook usado para calcular e validar a assinatura HMAC dos eventos.
+</ResponseField>
+
+<ResponseField name="idempotência" type="conceito">
+  Garantia de processar cada evento uma única vez. Use o `id` da entrega do webhook para deduplicar.
+</ResponseField>
+
+<ResponseField name="MED (Infração)" type="conceito">
+  Mecanismo Especial de Devolução do PIX. Uma infração pode resultar na devolução do valor ao pagador. Notificada pelo evento `infraction`.
+</ResponseField>
+
+<ResponseField name="chargeback" type="conceito">
+  Contestação de uma cobrança no cartão pelo titular, que pode resultar em estorno.
+</ResponseField>

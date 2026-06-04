@@ -1,0 +1,78 @@
+---
+title: "Transferências"
+description: "Eventos do ciclo de vida de transferências e saques."
+icon: "money-bill-transfer"
+---
+
+| Evento | Disparado quando |
+| --- | --- |
+| `transfer_created` | Uma transferência é iniciada. |
+| `transfer_completed` | A transferência é concluída com sucesso. |
+| `transfer_canceled` | A transferência é cancelada. |
+| `transfer_updated` | A transferência muda de status. |
+
+Todos os eventos `transfer_*` compartilham o mesmo formato de payload.
+
+## Payload
+
+<Tabs>
+  <Tab title="transfer_completed">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transfer",
+      "event": "transfer_completed",
+      "scope": "user",
+      "transfer": {
+        "id": "clxtransfer123",
+        "amount": 50000,
+        "status": "completed",
+        "pix": { "endToEndId": "E12345678202606031200abcdef0002" }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="transfer_created">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transfer",
+      "event": "transfer_created",
+      "scope": "user",
+      "transfer": {
+        "id": "clxtransfer123",
+        "amount": 50000,
+        "status": "pending",
+        "pix": { "endToEndId": null }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="transfer_canceled">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transfer",
+      "event": "transfer_canceled",
+      "scope": "user",
+      "transfer": {
+        "id": "clxtransfer123",
+        "amount": 50000,
+        "status": "canceled",
+        "pix": { "endToEndId": null }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Campos
+
+<ResponseField name="transfer" type="object">
+  <Expandable title="propriedades">
+    <ResponseField name="transfer.id" type="string">ID da transferência.</ResponseField>
+    <ResponseField name="transfer.amount" type="number">Valor em centavos.</ResponseField>
+    <ResponseField name="transfer.status" type="string">Status atual da transferência.</ResponseField>
+    <ResponseField name="transfer.pix.endToEndId" type="string | null">Identificador end-to-end do PIX, quando disponível.</ResponseField>
+  </Expandable>
+</ResponseField>

@@ -1,0 +1,74 @@
+---
+title: "Recuperação de venda"
+description: "Eventos para recuperar vendas não concluídas: PIX não pago e carrinho abandonado."
+icon: "cart-shopping"
+---
+
+Estes eventos ajudam você a recuperar vendas que não se concretizaram — por exemplo, disparando uma mensagem de lembrete ao cliente.
+
+| Evento | Disparado quando |
+| --- | --- |
+| `sale_lost` | Um PIX foi criado mas **não foi pago** após cerca de 1 hora. |
+| `cart_abandoned` | Um cliente foi criado mas **não gerou nenhuma transação** após cerca de 1 hora. |
+
+## `sale_lost`
+
+```json
+{
+  "event": "sale_lost",
+  "seller": {
+    "id": "clxcompany123",
+    "name": "Sua Empresa",
+    "email": "contato@suaempresa.com",
+    "phone": "+5511999990000"
+  },
+  "customer": {
+    "id": "clxcustomer123",
+    "name": "Maria Silva",
+    "email": "maria@email.com",
+    "phone": "+5511999998888",
+    "buyDate": "2026-06-03T12:00:00.000Z"
+  },
+  "products": [
+    {
+      "id": "clxproduct123",
+      "name": "Produto A",
+      "description": "Descrição do produto",
+      "quantity": 1,
+      "unitPrice": 10000,
+      "amount": 10000,
+      "tangible": false,
+      "productId": "clxproduct123"
+    }
+  ]
+}
+```
+
+## `cart_abandoned`
+
+```json
+{
+  "event": "cart_abandoned",
+  "seller": {
+    "id": "clxcompany123",
+    "name": "Sua Empresa"
+  },
+  "customer": {
+    "id": "clxcustomer123",
+    "name": "Maria Silva",
+    "email": "maria@email.com",
+    "phone": "+5511999998888"
+  },
+  "products": {
+    "id": "clxproduct123",
+    "name": "Produto A",
+    "description": "Descrição do produto",
+    "amount": 10000,
+    "tangible": false
+  }
+}
+```
+
+<Note>
+  Em `cart_abandoned`, o campo `products` é um **objeto único** (o produto da oferta), enquanto em `sale_lost` e `card_declined` é uma **lista**. Trate cada evento conforme o seu formato.
+</Note>

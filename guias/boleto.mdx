@@ -1,0 +1,44 @@
+---
+title: "Boleto"
+description: "Como funcionam as cobranças via boleto bancário e o que o cliente recebe para pagar."
+icon: "barcode"
+---
+
+O boleto é ideal para clientes que preferem pagar no banco ou que não usam PIX. A cobrança nasce com status `pending` e passa a `paid` quando a compensação é confirmada — o que você recebe por [webhook](/webhooks/visao-geral).
+
+## O que o cliente recebe
+
+Ao criar um boleto, a API devolve tudo o que o cliente precisa para pagar:
+
+<CardGroup cols={2}>
+  <Card title="Linha digitável" icon="barcode">
+    O código (`digitableLine`) que o cliente digita no app do banco.
+  </Card>
+  <Card title="URL do boleto" icon="file-invoice">
+    Um link (`url`) para visualizar e imprimir o boleto.
+  </Card>
+</CardGroup>
+
+A resposta também traz o `barcode` (código de barras) e a data de vencimento (`dueAt`).
+
+## O que acontece depois de criar
+
+<Steps>
+  <Step title="Você cria a cobrança">
+    A API responde com `status: "pending"` e os dados do boleto. Guarde o `id` da transação.
+  </Step>
+  <Step title="O cliente paga">
+    Ele paga o boleto no banco ou pela linha digitável.
+  </Step>
+  <Step title="Você recebe o webhook">
+    A compensação pode levar **1 a 3 dias úteis**. Quando confirmada, chega um `transaction_paid` com `status: "paid"`.
+  </Step>
+</Steps>
+
+<Note>
+  Diferente do PIX (confirmação em segundos), o boleto **não é instantâneo**. Não libere o pedido na criação — espere o `transaction_paid`.
+</Note>
+
+<Card title="Referência: criar boleto" icon="code" href="/api-reference/boleto">
+  Corpo completo da requisição, campos de `customer` e formato da resposta.
+</Card>

@@ -1,0 +1,138 @@
+---
+title: "Verificação e segurança"
+description: "Valide a autenticidade dos webhooks com assinatura HMAC, garanta idempotência e lide com retentativas."
+icon: "shield-check"
+---
+
+Seu endpoint de webhook é público — qualquer um poderia tentar enviar requisições falsas para ele. Por isso, **valide a assinatura HMAC** de todo evento antes de processá-lo.
+
+## Assinatura HMAC
+
+Cada webhook é assinado com **HMAC-SHA256** usando o `signatureSecret` que você recebeu ao [cadastrar o webhook](/api-reference/webhooks-criar). A assinatura acompanha o evento no formato:
+
+```
+t=<timestamp_ms>,v1=<hmac_sha256_hex>
+```
+
+O HMAC é calculado sobre a string `` `${timestamp}.${corpo_raw}` ``. Para validar, recalcule a assinatura com o seu segredo e compare — usando uma comparação **time-safe**.
+
+<CodeGroup>
+```ts Node.js
+import crypto from "node:crypto"
+
+export function validarAssinatura(header: string, secret: string, rawBody: string): boolean {
+  const [tsPart, v1Part] = header.split(",")
+  const timestamp = tsPart.split("=")[1]
+  const recebida = v1Part.split("=")[1]
+
+  const esperada = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest("hex")
+
+  const a = Buffer.from(esperada)
+  const b = Buffer.from(recebida)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+```
+
+```python Python
+import hmac, hashlib
+
+def validar_assinatura(header: str, secret: str, raw_body: str) -> bool:
+    ts_part, v1_part = header.split(",")
+    timestamp = ts_part.split("=")[1]
+    recebida = v1_part.split("=")[1]
+
+    esperada = hmac.new(
+        secret.encode("utf-8"),
+        f"{timestamp}.{raw_body}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    return hmac.compare_digest(esperada, recebida)
+```
+
+```go Go
+package webhook
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "strings"
+)
+
+func ValidarAssinatura(header, secret, rawBody string) bool {
+    parts := strings.Split(header, ",")
+    timestamp := strings.SplitN(parts[0], "=", 2)[1]
+    recebida := strings.SplitN(parts[1], "=", 2)[1]
+
+    mac := hmac.New(sha256.New, []byte(secret))
+    mac.Write([]byte(timestamp + "." + rawBody))
+    esperada := hex.EncodeToString(mac.Sum(nil))
+
+    return hmac.Equal([]byte(esperada), []byte(recebida))
+}
+```
+</CodeGroup>
+
+<Warning>
+  Use sempre `timingSafeEqual` / `hmac.compare_digest` / `hmac.Equal` ao comparar assinaturas — **nunca `===` ou `==`**. Comparações diretas são vulneráveis a *timing attacks*.
+</Warning>
+
+<Tip>
+  Calcule o HMAC sobre o **corpo raw** (a string exata recebida), antes de qualquer `JSON.parse`. Re-serializar o JSON pode reordenar campos e invalidar a assinatura.
+</Tip>
+
+### Proteção contra replay
+
+Compare o `timestamp` da assinatura com o horário atual e rejeite entregas muito antigas (ex.: mais de 5 minutos). Isso evita que um evento legítimo capturado seja reenviado mais tarde por um atacante.
+
+## Idempotência
+
+A mesma entrega pode chegar **mais de uma vez** (retentativa ou reenvio). Registre o `id` do evento e descarte duplicatas antes de processar.
+
+```ts
+app.post("/webhooks/ephra", async (req, res) => {
+  const evento = req.body
+
+  // 1. valide a assinatura (HMAC) — veja acima
+  // 2. idempotência:
+  const jaProcessado = await db.eventos.findOne({ id: evento.id })
+  if (jaProcessado) return res.sendStatus(200)
+
+  if (evento.event === "transaction_paid" && evento.transaction?.status === "paid") {
+    // libere o pedido referente a evento.transaction.id
+  }
+
+  await db.eventos.insert({ id: evento.id, processadoEm: new Date() })
+  return res.sendStatus(200)
+})
+```
+
+## Retentativas
+
+Se seu endpoint não responder `2xx`, a Ephra reenvia o evento automaticamente:
+
+- Até **3 retentativas** por entrega.
+- Backoff crescente: aproximadamente **8 min**, **15 min** e **30 min**.
+- São retentadas apenas entregas das **últimas 48 horas**; depois disso, a entrega é marcada como `failed`.
+- **Timeout** de 60 segundos por tentativa.
+
+Se o seu processamento for pesado, responda `200` imediatamente e processe em segundo plano (enfileire).
+
+## Checklist de segurança
+
+<Card horizontal>
+  - Use **HTTPS** — nunca HTTP em produção.
+  - **Valide a assinatura HMAC** do header com comparação time-safe.
+  - Rejeite entregas com `timestamp` muito antigo (replay).
+  - Responda **`2xx`** somente após concluir (ou enfileirar) o processamento.
+  - Implemente **idempotência** usando o `id` do evento.
+  - **Não valide o payload inteiro** com schemas rígidos — campos novos não devem quebrar seu endpoint.
+</Card>
+
+<Note>
+  Para valores altos, confirme o estado real com [`GET /v1/transactions/{id}`](/api-reference/transacoes-consultar) antes de liberar o pedido.
+</Note>

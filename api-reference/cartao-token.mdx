@@ -1,0 +1,10 @@
+---
+title: "Tokenizar cartão"
+openapi: "POST /v1/card-token"
+---
+
+Tokeniza os dados sensíveis do cartão e devolve um `token` opaco. Use esse token no campo `card.cardToken` ao [criar a cobrança](/api-reference/cartao-cobranca) — número e CVV **nunca** trafegam na rota de cobrança.
+
+<Warning>
+  Esta é a única rota que recebe número e CVV do cartão. Chame-a a partir do seu back-end, sobre HTTPS.
+</Warning>

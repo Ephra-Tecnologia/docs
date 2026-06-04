@@ -1,0 +1,102 @@
+---
+title: "Webhooks"
+description: "Receba notificações automáticas da Ephra sempre que uma transação muda de estado — sem ficar consultando a API."
+icon: "webhook"
+---
+
+Pense nos webhooks como **mensagens que a Ephra envia para o seu sistema**: em vez de você ficar perguntando "esse PIX já foi pago?", a Ephra avisa você no instante em que o pagamento é confirmado.
+
+<Note>
+  Webhooks são **somente notificações**. A Ephra envia um evento quando o status de uma transação muda do lado dela — o ciclo de status é controlado pela Ephra e **não existe endpoint na API para o cliente alterar o status** de uma transação.
+</Note>
+
+## Por que usar webhooks?
+
+Sem webhooks, sua aplicação precisaria **perguntar para a API a cada segundo**:
+
+> "Esse pagamento já foi confirmado?"
+
+Isso é lento e desperdiça requisições. Com webhooks, a Ephra avisa você **imediatamente**:
+
+> "O pagamento foi confirmado. Aqui estão os dados."
+
+Assim você pode, na hora e sem intervenção manual:
+
+- liberar o pedido ou o acesso a um produto;
+- atualizar o status no seu sistema;
+- disparar e-mails ou mensagens;
+- registrar a movimentação financeira.
+
+## Como funciona na prática
+
+<Steps>
+  <Step title="Crie um endpoint no seu sistema">
+    Uma URL HTTPS pública que vai receber os eventos. Ex.: `https://seusite.com/webhooks/ephra`.
+  </Step>
+  <Step title="Cadastre a URL na Ephra">
+    Via dashboard ou pela rota [`POST /v1/webhook`](/api-reference/webhooks-criar). Você escolhe **quais eventos** quer receber e recebe um `signatureSecret`.
+  </Step>
+  <Step title="Receba os POSTs">
+    A cada mudança de status, a Ephra faz um `POST` com o payload da transação no seu endpoint.
+  </Step>
+  <Step title="Responda 2xx">
+    Confirme o recebimento com qualquer status `2xx`. Qualquer outra resposta entra em retentativa.
+  </Step>
+</Steps>
+
+<Tip>
+  Precisa de webhook só para uma cobrança específica? Informe `postbackUrl` no corpo daquela cobrança — aquele endpoint recebe os eventos somente daquela transação, sem cadastrar um webhook permanente.
+</Tip>
+
+## O evento que mais importa: `transaction_paid`
+
+Na maioria das integrações, o evento que dispara a liberação do pedido é o **`transaction_paid`** (`status: "paid"`). Os demais eventos cobrem estorno, recusa, recuperação de venda, assinaturas, transferências e infrações — veja todos na seção **Eventos**.
+
+<CardGroup cols={2}>
+  <Card title="Transações" icon="receipt" href="/webhooks/eventos/transacoes">
+    `transaction_created`, `transaction_paid`, `transaction_refunded`, `transaction_updated`, `card_declined`.
+  </Card>
+  <Card title="Recuperação" icon="cart-shopping" href="/webhooks/eventos/recuperacao">
+    `sale_lost`, `cart_abandoned`.
+  </Card>
+  <Card title="Assinaturas" icon="rotate" href="/webhooks/eventos/assinaturas">
+    `product_canceled`.
+  </Card>
+  <Card title="Transferências" icon="money-bill-transfer" href="/webhooks/eventos/transferencias">
+    `transfer_created`, `transfer_completed`, `transfer_canceled`, `transfer_updated`.
+  </Card>
+</CardGroup>
+
+## Formato do payload
+
+Todos os webhooks de transação compartilham a mesma estrutura. Os campos variam conforme o evento, mas o esqueleto é sempre este:
+
+```json
+{
+  "id": "9f1c8e2a-...-uuid",
+  "type": "transaction",
+  "event": "transaction_paid",
+  "scope": "user",
+  "transaction": { "id": "clx...", "amount": 10000, "status": "paid" },
+  "customer": { "name": "Maria Silva", "email": "maria@email.com" },
+  "company": { "name": "Sua Empresa", "document": "11222333000181" }
+}
+```
+
+<Info>
+  O campo `id` é o identificador **da entrega** (não da transação). O ID da transação está em `transaction.id`. Use o `event` para rotear o tratamento no seu lado.
+</Info>
+
+## Boas práticas
+
+<Card title="Recomendações" horizontal>
+  - Use **HTTPS** em todos os endpoints.
+  - **Valide a assinatura HMAC** de cada evento — veja [Segurança](/webhooks/seguranca).
+  - Seja **idempotente**: registre o `id` do evento e processe cada um uma única vez.
+  - Responda **`2xx`** somente depois de concluir (ou enfileirar) o processamento.
+  - **Não valide o payload inteiro** com schemas rígidos — campos novos podem ser adicionados no futuro e não devem quebrar seu endpoint.
+</Card>
+
+<Card title="Próximo passo: segurança" icon="shield-check" href="/webhooks/seguranca">
+  Como validar a assinatura HMAC, garantir idempotência e lidar com retentativas.
+</Card>

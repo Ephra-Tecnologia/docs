@@ -1,0 +1,14 @@
+---
+title: "Criar cobrança PIX (QR Code)"
+openapi: "POST /v1/pix/in/qrcode"
+---
+
+Gera um QR Code PIX dinâmico, **sem vencimento** — ideal para checkout. A resposta traz o `emv` (copia e cola) e o `qrCode` (imagem PNG em base64). A cobrança nasce com `status: "pending"` e é confirmada por [webhook](/webhooks/eventos/transacoes).
+
+<Note>
+  Se você enviar `items`, o `amountInCents` deve ser igual à soma de `amountInCents × quantity` de cada item.
+</Note>
+
+<Info>
+  Visão conceitual e quando usar cada tipo de PIX em [Guias › Pagamentos PIX](/guias/pix).
+</Info>

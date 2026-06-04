@@ -1,0 +1,58 @@
+---
+title: "Assinaturas"
+description: "Eventos do ciclo de vida de assinaturas e produtos recorrentes."
+icon: "rotate"
+---
+
+| Evento | Disparado quando |
+| --- | --- |
+| `product_canceled` | Uma assinatura ou produto recorrente é cancelado. |
+
+## `product_canceled`
+
+```json
+{
+  "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+  "type": "subscription",
+  "event": "product_canceled",
+  "scope": "user",
+  "subscription": {
+    "id": "clxsubscription123",
+    "cancelReason": "max_retries"
+  },
+  "product": {
+    "id": "clxproduct123",
+    "name": "Plano Pro",
+    "deliveryType": "memberkit"
+  },
+  "customer": {
+    "id": "clxcustomer123",
+    "email": "maria@email.com",
+    "name": "Maria Silva"
+  },
+  "transaction": {
+    "id": "clxabc123def456"
+  }
+}
+```
+
+### Campos
+
+<ResponseField name="subscription" type="object">
+  <Expandable title="propriedades">
+    <ResponseField name="subscription.id" type="string">ID da assinatura.</ResponseField>
+    <ResponseField name="subscription.cancelReason" type="string">Motivo do cancelamento (ex.: `max_retries`, `customer`, `producer`).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="product" type="object">
+  Produto vinculado: `id`, `name`, `deliveryType`.
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Cliente: `id`, `email` e, quando disponível, `name`.
+</ResponseField>
+
+<ResponseField name="transaction" type="object">
+  A transação âncora da assinatura: `id`.
+</ResponseField>

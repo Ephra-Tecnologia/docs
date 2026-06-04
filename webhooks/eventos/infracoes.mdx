@@ -1,0 +1,56 @@
+---
+title: "Infrações"
+description: "Evento de infração (MED / disputa) sobre uma transação PIX."
+icon: "triangle-exclamation"
+---
+
+| Evento | Disparado quando |
+| --- | --- |
+| `infraction` | Uma infração (MED — Mecanismo Especial de Devolução) ou disputa é registrada sobre uma transação PIX. |
+
+## `infraction`
+
+```json
+{
+  "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+  "type": "infraction",
+  "event": "infraction",
+  "scope": "user",
+  "infraction": {
+    "id": "clxinfraction123",
+    "amount": 10000,
+    "status": "open",
+    "pix": {
+      "endToEndId": "E12345678202606031200abcdef0001"
+    }
+  },
+  "transaction": {
+    "id": "clxabc123def456",
+    "amount": 10000,
+    "status": "paid",
+    "pix": {
+      "endToEndId": "E12345678202606031200abcdef0001",
+      "payerInfo": { "name": "Maria Silva", "cpf": "***456789**" }
+    }
+  }
+}
+```
+
+### Campos
+
+<ResponseField name="infraction" type="object">
+  <Expandable title="propriedades">
+    <ResponseField name="infraction.id" type="string">ID da infração.</ResponseField>
+    <ResponseField name="infraction.amount" type="number">Valor envolvido, em centavos.</ResponseField>
+    <ResponseField name="infraction.status" type="string">Status da infração.</ResponseField>
+    <ResponseField name="infraction.pix.endToEndId" type="string | null">End-to-end do PIX relacionado.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="transaction" type="object">
+  A transação relacionada à infração: `id`, `amount`, `status` e `pix`.
+</ResponseField>
+
+<Warning>
+  Uma infração pode levar à devolução do valor ao pagador. Acompanhe este evento para tratar disputas e ajustar o status do pedido no seu sistema.
+</Warning>

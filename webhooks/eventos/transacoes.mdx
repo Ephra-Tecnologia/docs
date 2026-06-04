@@ -1,0 +1,213 @@
+---
+title: "Transações"
+description: "Eventos disparados ao longo do ciclo de vida de uma cobrança PIX, cartão ou boleto."
+icon: "receipt"
+---
+
+Estes são os eventos do dia a dia de uma integração de pagamentos. Todos os eventos `transaction_*` compartilham o **mesmo formato de payload**.
+
+| Evento | Disparado quando |
+| --- | --- |
+| `transaction_created` | A cobrança é criada (PIX e boleto nascem aqui, com `status: "pending"`). |
+| `transaction_paid` | O pagamento é **confirmado** (`status: "paid"`). É o gatilho para liberar o pedido. |
+| `transaction_refunded` | Um estorno é concluído (`status: "refund"`). |
+| `transaction_updated` | Notifica uma mudança de status da transação (ex.: passou a `refused`). |
+| `card_declined` | Uma cobrança no cartão foi recusada pelo processador. |
+
+## Payload dos eventos `transaction_*`
+
+<Tabs>
+  <Tab title="transaction_paid">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transaction",
+      "event": "transaction_paid",
+      "scope": "user",
+      "transaction": {
+        "id": "clxabc123def456",
+        "amount": 10000,
+        "status": "paid",
+        "pix": {
+          "endToEndId": "E12345678202606031200abcdef0001",
+          "payerInfo": { "name": "Maria Silva", "cpf": "***456789**" }
+        }
+      },
+      "customer": {
+        "name": "Maria Silva",
+        "email": "maria@email.com",
+        "phone": "+5511999998888",
+        "document": "12345678909",
+        "documentType": "cpf",
+        "purchaseDate": "2026-06-03T12:00:00.000Z"
+      },
+      "company": { "name": "Sua Empresa", "document": "11222333000181", "documentType": "cnpj" },
+      "sale": {
+        "type": "one_time",
+        "subscriptionInterval": null,
+        "renewalType": null,
+        "mainOfferId": null,
+        "orderBumpIds": [],
+        "orderBumpOfferIds": []
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="transaction_created">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transaction",
+      "event": "transaction_created",
+      "scope": "user",
+      "transaction": {
+        "id": "clxabc123def456",
+        "amount": 10000,
+        "status": "pending",
+        "pix": { "endToEndId": null, "payerInfo": null }
+      },
+      "customer": {
+        "name": "Maria Silva",
+        "email": "maria@email.com",
+        "phone": "+5511999998888",
+        "document": "12345678909",
+        "documentType": "cpf",
+        "purchaseDate": "2026-06-03T12:00:00.000Z"
+      },
+      "company": { "name": "Sua Empresa", "document": "11222333000181", "documentType": "cnpj" }
+    }
+    ```
+  </Tab>
+  <Tab title="transaction_refunded">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transaction",
+      "event": "transaction_refunded",
+      "scope": "user",
+      "transaction": { "id": "clxabc123def456", "amount": 10000, "status": "refund" },
+      "customer": {
+        "name": "Maria Silva",
+        "email": "maria@email.com",
+        "document": "12345678909",
+        "documentType": "cpf",
+        "purchaseDate": "2026-06-03T12:00:00.000Z"
+      },
+      "company": { "name": "Sua Empresa", "document": "11222333000181", "documentType": "cnpj" }
+    }
+    ```
+  </Tab>
+  <Tab title="transaction_updated">
+    ```json
+    {
+      "id": "9f1c8e2a-2b7d-4c1a-9f3e-uuid",
+      "type": "transaction",
+      "event": "transaction_updated",
+      "scope": "user",
+      "transaction": {
+        "id": "clxabc123def456",
+        "amount": 10000,
+        "status": "refused",
+        "refuseReason": "INSUFFICIENT_FUNDS"
+      },
+      "customer": {
+        "name": "Maria Silva",
+        "email": "maria@email.com",
+        "document": "12345678909",
+        "documentType": "cpf",
+        "purchaseDate": "2026-06-03T12:00:00.000Z"
+      },
+      "company": { "name": "Sua Empresa", "document": "11222333000181", "documentType": "cnpj" }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Campos
+
+<ResponseField name="id" type="string">
+  UUID **da entrega** (não é o ID da transação). Use-o para garantir [idempotência](/webhooks/seguranca#idempotencia).
+</ResponseField>
+
+<ResponseField name="event" type="string">
+  Nome do evento. Use este campo para rotear o tratamento no seu sistema.
+</ResponseField>
+
+<ResponseField name="scope" type="string">
+  Origem do webhook: `user` (um webhook que você cadastrou) ou `postback` (a `postbackUrl` informada na cobrança).
+</ResponseField>
+
+<ResponseField name="transaction" type="object">
+  <Expandable title="propriedades">
+    <ResponseField name="transaction.id" type="string">ID da transação.</ResponseField>
+    <ResponseField name="transaction.amount" type="number">Valor em centavos.</ResponseField>
+    <ResponseField name="transaction.status" type="string">Status atual. Veja [Status e erros](/api-reference/status-e-erros).</ResponseField>
+    <ResponseField name="transaction.refuseReason" type="string">Motivo da recusa. Presente apenas quando existe.</ResponseField>
+    <ResponseField name="transaction.pix" type="object">Dados do PIX (`endToEndId`, `payerInfo`). Presente quando a transação é PIX.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="customer" type="object">
+  Dados do cliente: `name`, `email`, `phone`, `document`, `documentType`, `purchaseDate`.
+</ResponseField>
+
+<ResponseField name="company" type="object">
+  Sua empresa: `name`, `document`, `documentType`.
+</ResponseField>
+
+<ResponseField name="sale" type="object">
+  Metadados da venda (tipo, recorrência, ofertas). Para transações criadas via API, vem com os valores padrão (`one_time`, listas vazias).
+</ResponseField>
+
+<Info>
+  O payload contém dados pessoais do pagador (`document`, `payerInfo`). Trate-os conforme a LGPD e armazene apenas o necessário.
+</Info>
+
+## Evento `card_declined`
+
+Disparado quando uma cobrança no cartão é recusada. Usa um formato próprio, voltado a recuperação/notificação:
+
+```json
+{
+  "event": "card_declined",
+  "seller": {
+    "id": "clxcompany123",
+    "name": "Sua Empresa",
+    "email": "contato@suaempresa.com",
+    "phone": "+5511999990000"
+  },
+  "customer": {
+    "id": "clxcustomer123",
+    "name": "Maria Silva",
+    "email": "maria@email.com",
+    "phone": "+5511999998888",
+    "buyDate": "2026-06-03T12:00:00.000Z"
+  },
+  "products": [
+    {
+      "id": "clxproduct123",
+      "name": "Produto A",
+      "description": "Descrição do produto",
+      "quantity": 1,
+      "unitPrice": 10000,
+      "amount": 10000,
+      "tangible": false,
+      "productId": "clxproduct123"
+    }
+  ]
+}
+```
+
+## Ciclo de status de uma cobrança
+
+<Steps>
+  <Step title="transaction_created">
+    Você cria a cobrança e recebe este evento quase imediatamente, com `status: "pending"`.
+  </Step>
+  <Step title="transaction_paid">
+    O cliente paga e você recebe este evento com `status: "paid"`. Libere o pedido aqui.
+  </Step>
+  <Step title="transaction_refunded (eventual)">
+    Caso haja estorno, você recebe este evento depois.
+  </Step>
+</Steps>

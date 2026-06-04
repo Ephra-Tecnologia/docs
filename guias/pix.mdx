@@ -1,9 +1,10 @@
 ---
 title: "Pagamentos PIX"
 description: "Como funcionam as cobranças PIX: os dois tipos, o que o cliente recebe e o ciclo de status até o pago."
+icon: "qrcode"
 ---
 
-O PIX é a forma mais rápida de receber: o cliente paga em segundos e você é avisado por [webhook](/guias/webhooks). Toda cobrança PIX nasce com status `pending` e passa a `paid` quando o pagamento é confirmado.
+O PIX é a forma mais rápida de receber: o cliente paga em segundos e você é avisado por [webhook](/webhooks/visao-geral). Toda cobrança PIX nasce com status `pending` e passa a `paid` quando o pagamento é confirmado.
 
 ## Dois tipos de cobrança
 
@@ -43,6 +44,6 @@ Os dois retornam o mesmo par de campos para o cliente pagar:
   Um PIX criado e não pago dispara o evento `sale_lost` após cerca de 1 hora — útil para recuperação de carrinho.
 </Tip>
 
-<Card title="Referência: rotas PIX" icon="code" href="/api-reference/pix">
+<Card title="Referência: rotas PIX" icon="code" href="/api-reference/pix-qrcode">
   Corpo completo da requisição, campos de `customer`, regras de `cob` (vencimento) e respostas.
 </Card>

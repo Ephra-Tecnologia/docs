@@ -1,0 +1,12 @@
+---
+title: "Criar cobrança no cartão"
+openapi: "POST /v1/card"
+---
+
+Cria uma cobrança no cartão de crédito usando um `cardToken` (obtido em [Tokenizar cartão](/api-reference/cartao-token)). Em até **12 parcelas**.
+
+Diferente do PIX, o cartão pode resolver na hora: a resposta vem com `status` `paid`, `refused` ou `pending` (quando o adquirente confirma de forma assíncrona). Quando recusado, o `refuseReason` explica o motivo.
+
+<Info>
+  Visão conceitual (segurança, parcelas, recusas) em [Guias › Pagamentos no cartão](/guias/cartao).
+</Info>

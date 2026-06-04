@@ -1,0 +1,14 @@
+---
+title: "Cadastrar webhook"
+openapi: "POST /v1/webhook"
+---
+
+Cadastra um endpoint HTTPS para receber notificações de eventos. A URL é testada com um `POST` no momento do cadastro.
+
+<Warning>
+  Guarde o `signatureSecret` retornado — você precisa dele para [validar a assinatura](/webhooks/seguranca) de cada webhook recebido.
+</Warning>
+
+<Info>
+  Veja todos os eventos disponíveis e seus payloads em [Webhooks › Eventos](/webhooks/eventos/transacoes).
+</Info>

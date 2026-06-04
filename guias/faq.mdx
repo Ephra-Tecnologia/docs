@@ -1,0 +1,59 @@
+---
+title: "Perguntas frequentes"
+description: "Dúvidas comuns sobre integração, pagamentos e webhooks na Ephra."
+icon: "circle-question"
+---
+
+<AccordionGroup>
+  <Accordion title="Como obtenho minhas credenciais de API?" icon="key">
+    A API key (`public` + `secret`) é gerada no painel da sua empresa. Use-a na rota [`POST /auth`](/api-reference/autenticacao) para obter o token de acesso. O `secret` só aparece uma vez — guarde-o em um cofre de segredos.
+  </Accordion>
+
+  <Accordion title="Os valores são em reais ou centavos?" icon="coins">
+    Sempre em **centavos**. `amountInCents: 10000` equivale a R$ 100,00. As taxas em `fees` também vêm em centavos.
+  </Accordion>
+
+  <Accordion title="Quanto tempo dura o token de acesso?" icon="clock">
+    O token é de curta duração — a validade vem em `expiresIn` (milissegundos) na resposta do login. Gere um novo token antes de iniciar suas operações e reutilize-o enquanto for válido. Veja [Autenticação](/guias/autenticacao).
+  </Accordion>
+
+  <Accordion title="Qual a diferença entre PIX imediato e PIX com vencimento?" icon="qrcode">
+    O **PIX imediato** (`/v1/pix/in/qrcode`) gera um QR Code para pagamento na hora, sem vencimento. O **PIX com vencimento** (`/v1/pix/in/cob`) tem data de vencimento e regras de multa, juros e desconto. Veja [PIX](/guias/pix).
+  </Accordion>
+
+  <Accordion title="Como sei que um pagamento foi confirmado?" icon="bell">
+    Pelo webhook **`transaction_paid`** (`status: "paid"`). Esse é o gatilho para liberar o pedido. Evite polling — use webhooks. Como fallback, você pode consultar [`GET /v1/transactions/{id}`](/api-reference/transacoes-consultar).
+  </Accordion>
+
+  <Accordion title="Preciso confirmar o pagamento na resposta da criação?" icon="circle-check">
+    Não. PIX e boleto nascem `pending`. Só libere o pedido quando receber o webhook `transaction_paid`. Cartão pode resolver na hora (`paid`/`refused`), mas confirme via webhook para os casos assíncronos.
+  </Accordion>
+
+  <Accordion title="Posso enviar dados do cartão direto na cobrança?" icon="credit-card">
+    Não. Primeiro tokenize em [`POST /v1/card-token`](/api-reference/cartao-token) e use o `cardToken` na cobrança. Número e CVV nunca trafegam na rota de cobrança.
+  </Accordion>
+
+  <Accordion title="Como garanto que não vou processar o mesmo webhook duas vezes?" icon="repeat">
+    Use o campo `id` do evento (identificador da entrega) para deduplicar. A mesma entrega pode chegar mais de uma vez por retentativa. Veja [Idempotência](/webhooks/seguranca#idempotencia).
+  </Accordion>
+
+  <Accordion title="Como valido que o webhook veio mesmo da Ephra?" icon="shield-check">
+    Valide a **assinatura HMAC-SHA256** com o `signatureSecret` do webhook, usando comparação time-safe. Veja [Segurança dos webhooks](/webhooks/seguranca).
+  </Accordion>
+
+  <Accordion title="O que acontece se meu endpoint estiver fora do ar?" icon="rotate">
+    A Ephra reenvia o evento até 3 vezes, com backoff crescente (~8, 15 e 30 min), por até 48 horas. Depois disso, a entrega é marcada como `failed`.
+  </Accordion>
+
+  <Accordion title="Recebi 401 mesmo com o token. O que pode ser?" icon="lock">
+    O token pode ter expirado, ou a sessão associada foi encerrada. Faça login novamente e repita a chamada. Confira também se o header está no formato `Authorization: Bearer <token>`.
+  </Accordion>
+
+  <Accordion title="Recebi 400 ao criar uma cobrança. O que verificar?" icon="triangle-exclamation">
+    Cheque o `amountInCents` (inteiro positivo), o documento do cliente (CPF/CNPJ válido) e, se enviar `items`, se a soma bate com o `amountInCents`. A mensagem de erro descreve o problema.
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Não encontrou sua dúvida?" icon="headset" href="mailto:suporte@ephra.io">
+  Fale com o suporte: suporte@ephra.io
+</Card>

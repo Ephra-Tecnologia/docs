@@ -7,26 +7,81 @@
     "light": "#BD8FF4",
     "dark": "#8438E0"
   },
+  "appearance": {
+    "default": "dark"
+  },
   "favicon": "/logo/logo.png",
+  "api": {
+    "mdx": {
+      "server": "https://api.ephra.io",
+      "auth": {
+        "method": "bearer"
+      }
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guias",
+        "tab": "Comece aqui",
         "groups": [
           {
-            "group": "Primeiros passos",
+            "group": "Comece aqui",
             "pages": [
               "index",
               "quickstart"
             ]
+          }
+        ]
+      },
+      {
+        "tab": "Guias",
+        "groups": [
+          {
+            "group": "Integração",
+            "pages": [
+              "guias/autenticacao"
+            ]
           },
           {
-            "group": "Conceitos",
+            "group": "Pagamentos",
             "pages": [
-              "guias/autenticacao",
               "guias/pix",
               "guias/cartao",
-              "guias/webhooks"
+              "guias/boleto"
+            ]
+          },
+          {
+            "group": "Ajuda",
+            "pages": [
+              "guias/faq",
+              "guias/glossario"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Webhooks",
+        "groups": [
+          {
+            "group": "Visão geral",
+            "pages": [
+              "webhooks/visao-geral"
+            ]
+          },
+          {
+            "group": "Segurança",
+            "pages": [
+              "webhooks/seguranca"
+            ]
+          },
+          {
+            "group": "Eventos",
+            "pages": [
+              "webhooks/eventos/transacoes",
+              "webhooks/eventos/recuperacao",
+              "webhooks/eventos/assinaturas",
+              "webhooks/eventos/transferencias",
+              "webhooks/eventos/infracoes"
             ]
           }
         ]
@@ -35,7 +90,7 @@
         "tab": "Referência da API",
         "groups": [
           {
-            "group": "Começar",
+            "group": "Introdução",
             "pages": [
               "api-reference/introducao",
               "api-reference/autenticacao"
@@ -44,16 +99,28 @@
           {
             "group": "Pagamentos",
             "pages": [
-              "api-reference/pix",
-              "api-reference/cartao",
-              "api-reference/transacoes"
+              "api-reference/pix-qrcode",
+              "api-reference/pix-cobranca",
+              "api-reference/cartao-token",
+              "api-reference/cartao-cobranca",
+              "api-reference/boleto"
+            ]
+          },
+          {
+            "group": "Transações",
+            "pages": [
+              "api-reference/transacoes-consultar",
+              "api-reference/transacoes-listar"
             ]
           },
           {
             "group": "Webhooks",
             "pages": [
-              "api-reference/webhooks",
-              "api-reference/eventos"
+              "api-reference/webhooks-criar",
+              "api-reference/webhooks-listar",
+              "api-reference/webhooks-consultar",
+              "api-reference/webhooks-remover",
+              "api-reference/webhooks-supressoes"
             ]
           },
           {

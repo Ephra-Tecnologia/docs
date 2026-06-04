@@ -1,0 +1,14 @@
+---
+title: "Criar cobrança via boleto"
+openapi: "POST /v1/boleto"
+---
+
+Gera um boleto bancário. A resposta traz a linha digitável (`digitableLine`), o código de barras (`barcode`) e uma `url` para visualização e impressão. A cobrança nasce com `status: "pending"`.
+
+<Note>
+  A compensação de boleto leva de 1 a 3 dias úteis. Aguarde o webhook `transaction_paid` antes de liberar o pedido.
+</Note>
+
+<Info>
+  Visão conceitual e prazos em [Guias › Boleto](/guias/boleto).
+</Info>

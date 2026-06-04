@@ -1,0 +1,622 @@
+openapi: 3.0.3
+info:
+  title: API Ephra
+  description: API REST para gerar cobranças (PIX, cartão e boleto), consultar transações e gerenciar webhooks.
+  version: 1.0.0
+servers:
+  - url: https://api.ephra.io
+    description: Servidor de produção
+security:
+  - bearerAuth: []
+tags:
+  - name: Autenticação
+    description: Login e obtenção do token de acesso
+  - name: Pagamentos
+    description: Criação de cobranças PIX, cartão e boleto
+  - name: Transações
+    description: Consulta de transações
+  - name: Webhooks
+    description: Cadastro e gerenciamento de webhooks
+paths:
+  /auth:
+    post:
+      tags: [Autenticação]
+      summary: Obter token de acesso
+      description: Troca a API key (HTTP Basic com `public:secret`) por um token de acesso Bearer de curta duração.
+      operationId: login
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Token gerado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  token: { type: string, example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
+                  tokenType: { type: string, example: 'Bearer' }
+                  expiresIn: { type: integer, description: 'Validade do token em milissegundos', example: 60000 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/pix/in/qrcode:
+    post:
+      tags: [Pagamentos]
+      summary: Criar cobrança PIX (QR Code imediato)
+      description: Gera um QR Code PIX dinâmico, sem vencimento. A cobrança nasce com `status` `pending` e é confirmada por webhook.
+      operationId: createPixQrCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PixQrCodeRequest'
+      responses:
+        '200':
+          description: Cobrança criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PixResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/pix/in/cob:
+    post:
+      tags: [Pagamentos]
+      summary: Criar cobrança PIX (com vencimento)
+      description: Gera uma cobrança PIX com data de vencimento, multa, juros e desconto. A cobrança nasce com `status` `pending`.
+      operationId: createPixCob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PixCobRequest'
+      responses:
+        '200':
+          description: Cobrança criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PixResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/card-token:
+    post:
+      tags: [Pagamentos]
+      summary: Tokenizar cartão
+      description: Tokeniza os dados sensíveis do cartão e devolve um `token` opaco para usar na cobrança. Número e CVV nunca trafegam na rota de cobrança.
+      operationId: tokenizeCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, holderName, expirationMonth, expirationYear, cvv]
+              properties:
+                number: { type: string, description: 'Número do cartão (validado por Luhn)', example: '4111111111111111' }
+                holderName: { type: string, example: 'MARIA SILVA' }
+                expirationMonth: { type: string, description: 'Mês 01-12', example: '07' }
+                expirationYear: { type: string, description: '2 ou 4 dígitos', example: '28' }
+                cvv: { type: string, description: '3 ou 4 dígitos', example: '123' }
+      responses:
+        '200':
+          description: Token gerado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  token: { type: string, example: 'tok_abc123...' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/card:
+    post:
+      tags: [Pagamentos]
+      summary: Criar cobrança no cartão
+      description: Cria uma cobrança no cartão de crédito usando um `cardToken`. Pode resolver na hora (`paid`/`refused`) ou ficar `pending` (confirmação assíncrona).
+      operationId: createCardCharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardRequest'
+      responses:
+        '200':
+          description: Cobrança processada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/boleto:
+    post:
+      tags: [Pagamentos]
+      summary: Criar cobrança via boleto
+      description: Gera um boleto bancário. A cobrança nasce com `status` `pending`; a compensação leva de 1 a 3 dias úteis e é confirmada por webhook.
+      operationId: createBoleto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PixQrCodeRequest'
+      responses:
+        '200':
+          description: Boleto criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: 'Transação criada com sucesso' }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, example: 'clxabc123def456' }
+                      boleto:
+                        type: object
+                        properties:
+                          url: { type: string, example: 'https://.../boleto/clxabc123def456' }
+                          barcode: { type: string, example: '23793381286000782726337000963779410010000025000' }
+                          digitableLine: { type: string, example: '23793.38128 60007.827263 37000.963779 4 10010000025000' }
+                          dueAt: { type: string, example: '2026-06-10T03:00:00.000Z' }
+                      status: { type: string, example: 'pending' }
+                      fees: { type: integer, example: 200 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/transactions:
+    get:
+      tags: [Transações]
+      summary: Listar transações
+      description: Retorna uma lista paginada de transações, com filtros opcionais.
+      operationId: listTransactions
+      parameters:
+        - { name: offset, in: query, schema: { type: string, default: '0' }, description: 'Deslocamento para paginação' }
+        - { name: status, in: query, schema: { type: string }, description: 'Filtra por status (ex.: paid, pending, refused)' }
+        - { name: paymentMethod, in: query, schema: { type: string, enum: [pix, credit_card, boleto] } }
+        - { name: transactionId, in: query, schema: { type: string } }
+        - { name: email, in: query, schema: { type: string } }
+        - { name: phone, in: query, schema: { type: string } }
+        - { name: document, in: query, schema: { type: string }, description: 'CPF/CNPJ do cliente' }
+        - { name: name, in: query, schema: { type: string } }
+        - { name: initialDate, in: query, schema: { type: string }, description: 'YYYY-MM-DD' }
+        - { name: finalDate, in: query, schema: { type: string }, description: 'YYYY-MM-DD' }
+      responses:
+        '200':
+          description: Lista de transações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Transaction' }
+                  totalRows: { type: integer, example: 42 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/transactions/{transactionId}:
+    get:
+      tags: [Transações]
+      summary: Consultar transação
+      description: Retorna o status e os detalhes de uma transação pelo seu `id`.
+      operationId: getTransaction
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string }
+          example: 'clxabc123def456'
+      responses:
+        '200':
+          description: Dados da transação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: '#/components/schemas/Transaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/webhook:
+    post:
+      tags: [Webhooks]
+      summary: Cadastrar webhook
+      description: Cadastra um endpoint HTTPS para receber notificações de eventos. A URL é testada com um POST no momento do cadastro. Guarde o `signatureSecret` retornado.
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url: { type: string, format: uri, example: 'https://seusite.com/webhooks/ephra' }
+                events:
+                  type: array
+                  items: { $ref: '#/components/schemas/WebhookEvent' }
+                  example: ['transaction_created', 'transaction_paid', 'transaction_refunded']
+                name: { type: string, nullable: true, example: 'Produção' }
+                isActive: { type: boolean, default: true }
+                productIds:
+                  type: array
+                  items: { type: string }
+                  description: 'Limita o webhook a produtos específicos. Omitido = todos.'
+      responses:
+        '201':
+          description: Webhook criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: '#/components/schemas/Webhook' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      tags: [Webhooks]
+      summary: Listar webhooks
+      description: Lista os webhooks cadastrados pela empresa, com paginação.
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: Lista de webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      webhooks:
+                        type: array
+                        items: { $ref: '#/components/schemas/Webhook' }
+                      pagination:
+                        type: object
+                        properties:
+                          offset: { type: integer, example: 0 }
+                          pageSize: { type: integer, example: 20 }
+                          totalCount: { type: integer, example: 3 }
+                          currentPage: { type: integer, example: 1 }
+                          totalPages: { type: integer, example: 1 }
+                          hasNext: { type: boolean, example: false }
+                          hasPrevious: { type: boolean, example: false }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/webhook/{id}:
+    get:
+      tags: [Webhooks]
+      summary: Consultar webhook
+      description: Retorna os detalhes de um webhook pelo seu `id`.
+      operationId: getWebhook
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer }, example: 42 }
+      responses:
+        '200':
+          description: Dados do webhook
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: '#/components/schemas/Webhook' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Webhooks]
+      summary: Remover webhook
+      description: Remove um webhook cadastrado.
+      operationId: deleteWebhook
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer }, example: 42 }
+      responses:
+        '200':
+          description: Webhook removido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/webhook/suppressions:
+    post:
+      tags: [Webhooks]
+      summary: Criar supressão de webhook
+      description: Cria uma regra para suprimir parte das entregas de um evento (anti-flood). Suprime `suppressCount` entregas a cada `interval`.
+      operationId: createWebhookSuppression
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, interval]
+              properties:
+                event: { $ref: '#/components/schemas/WebhookEvent' }
+                interval: { type: integer, minimum: 2, example: 10 }
+                suppressCount: { type: integer, minimum: 1, default: 1, example: 2 }
+                isActive: { type: boolean, default: true }
+      responses:
+        '201':
+          description: Supressão criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 1 }
+                      event: { $ref: '#/components/schemas/WebhookEvent' }
+                      interval: { type: integer, example: 10 }
+                      suppressCount: { type: integer, example: 2 }
+                      counter: { type: integer, example: 0 }
+                      isActive: { type: boolean, example: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    basicAuth:
+      type: http
+      scheme: basic
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 400, error: 'Bad Request', message: 'Documento inválido para o tipo selecionado' }
+    Unauthorized:
+      description: Token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 401, error: 'Unauthorized', message: 'Token inválido ou expirado' }
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 404, error: 'Not Found', message: 'Recurso não encontrado' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        statusCode: { type: integer, example: 400 }
+        error: { type: string, example: 'Bad Request' }
+        message: { type: string, example: 'Mensagem descritiva do erro' }
+    Address:
+      type: object
+      properties:
+        street: { type: string }
+        number: { type: string }
+        neighborhood: { type: string }
+        city: { type: string }
+        state: { type: string }
+        zipCode: { type: string }
+    Customer:
+      type: object
+      required: [documentType, document]
+      properties:
+        documentType: { type: string, enum: [cpf, cnpj], example: 'cpf' }
+        document: { type: string, description: 'CPF/CNPJ do pagador (validado)', example: '12345678909' }
+        name: { type: string, example: 'Maria Silva' }
+        email: { type: string, format: email, example: 'maria@email.com' }
+        phone: { type: string, example: '+5511999998888' }
+        billingAddress: { $ref: '#/components/schemas/Address' }
+    Seller:
+      type: object
+      required: [name, documentType, document]
+      properties:
+        name: { type: string }
+        documentType: { type: string, enum: [cpf, cnpj] }
+        document: { type: string }
+        phone: { type: string }
+        averageTicket: { type: number }
+        address: { $ref: '#/components/schemas/Address' }
+    Item:
+      type: object
+      required: [title, tangible, quantity, amountInCents]
+      properties:
+        title: { type: string, example: 'Produto A' }
+        tangible: { type: boolean, example: false }
+        quantity: { type: integer, minimum: 1, example: 1 }
+        amountInCents: { type: integer, example: 10000 }
+        shippingAddress: { $ref: '#/components/schemas/Address' }
+    PixQrCodeRequest:
+      type: object
+      required: [amountInCents, customer]
+      properties:
+        amountInCents: { type: integer, description: 'Valor em centavos (> 0)', example: 10000 }
+        description: { type: string, example: 'Pedido #1234' }
+        postbackUrl: { type: string, format: uri, description: 'Recebe webhooks só desta transação' }
+        customer: { $ref: '#/components/schemas/Customer' }
+        seller: { $ref: '#/components/schemas/Seller' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Item' }
+    PixCobRequest:
+      allOf:
+        - $ref: '#/components/schemas/PixQrCodeRequest'
+        - type: object
+          required: [cob]
+          properties:
+            cob:
+              type: object
+              required: [expirationDate]
+              properties:
+                expirationDate: { type: string, description: 'YYYY-MM-DD', example: '2026-07-01' }
+                daysAfterDueDate: { type: integer, example: 5 }
+                fine:
+                  type: object
+                  properties:
+                    type: { type: string, enum: [percent, fixed] }
+                    value: { type: number, example: 2 }
+                interest:
+                  type: object
+                  properties:
+                    type: { type: string, enum: [percent, fixed] }
+                    basis: { type: string, enum: [day, month, year] }
+                    calendar: { type: string, enum: [calendar, business] }
+                    value: { type: number, example: 1 }
+                discount:
+                  type: object
+                  description: 'Desconto por antecipação ou em datas fixas'
+                rebate:
+                  type: object
+                  properties:
+                    type: { type: string, enum: [percent, fixed] }
+                    value: { type: number }
+    CardRequest:
+      type: object
+      required: [amountInCents, card, customer]
+      properties:
+        amountInCents: { type: integer, example: 10000 }
+        description: { type: string, example: 'Pedido #1234' }
+        postbackUrl: { type: string, format: uri }
+        card:
+          type: object
+          required: [cardToken]
+          properties:
+            cardToken: { type: string, example: 'tok_abc123...' }
+            installments: { type: integer, minimum: 1, maximum: 12, default: 1, example: 1 }
+            holderName: { type: string, example: 'MARIA SILVA' }
+        customer: { $ref: '#/components/schemas/Customer' }
+        seller: { $ref: '#/components/schemas/Seller' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Item' }
+    PixResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: 'Transação criada com sucesso' }
+        data:
+          type: object
+          properties:
+            id: { type: string, example: 'clxabc123def456' }
+            pix:
+              type: object
+              properties:
+                emv: { type: string, example: '00020126580014br.gov.bcb.pix...6304ABCD' }
+                qrCode: { type: string, description: 'PNG em base64', example: 'data:image/png;base64,iVBORw0KG...' }
+            status: { type: string, example: 'pending' }
+            fees: { type: integer, example: 150 }
+    CardResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string, example: 'Transação aprovada' }
+        data:
+          type: object
+          properties:
+            id: { type: string, example: 'clxabc123def456' }
+            card:
+              type: object
+              properties:
+                token: { type: string, example: 'tok_abc123...' }
+                brand: { type: string, example: 'MASTERCARD' }
+                last4: { type: string, example: '1111' }
+            status: { type: string, enum: [paid, pending, refused], example: 'paid' }
+            fees: { type: integer, example: 175 }
+            refuseReason:
+              type: string
+              nullable: true
+              enum: [INSUFFICIENT_FUNDS, CARD_BLOCKED, INVALID_DATA, TIMEOUT, EXPIRED_CARD, ANTIFRAUD_REJECTED, OTHER]
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, example: 'clxabc123def456' }
+        paymentMethod: { type: string, example: 'pix' }
+        amount: { type: integer, example: 10000 }
+        netAmount: { type: integer, example: 9850 }
+        fees: { type: integer, example: 150 }
+        status: { type: string, example: 'paid' }
+        description: { type: string, nullable: true }
+        createdAt: { type: string, example: '2026-06-03T12:00:00.000Z' }
+        updatedAt: { type: string, example: '2026-06-03T12:01:30.000Z' }
+        aprovedAt: { type: string, nullable: true, example: '2026-06-03T12:01:30.000Z' }
+        refuseReason: { type: string, nullable: true }
+        customer:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string, example: 'Maria Silva' }
+            phone: { type: string, nullable: true }
+            documentType: { type: string, example: 'cpf' }
+            document: { type: string, example: '12345678909' }
+            emails:
+              type: array
+              items:
+                type: object
+                properties:
+                  email: { type: string, format: email }
+        Pix:
+          type: object
+          nullable: true
+          properties:
+            key: { type: string, nullable: true }
+            endToEndId: { type: string, nullable: true }
+            payerInfo: { type: object, nullable: true }
+    Webhook:
+      type: object
+      properties:
+        id: { type: integer, example: 42 }
+        name: { type: string, nullable: true, example: 'Produção' }
+        isActive: { type: boolean, example: true }
+        signatureSecret: { type: string, example: 'a1b2c3...' }
+        url: { type: string, example: 'https://seusite.com/webhooks/ephra' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/WebhookEvent' }
+        productIds:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, example: '2026-06-03T12:00:00.000Z' }
+    WebhookEvent:
+      type: string
+      enum:
+        - transaction_created
+        - transaction_paid
+        - transaction_refunded
+        - transaction_updated
+        - transfer_created
+        - transfer_completed
+        - transfer_canceled
+        - transfer_updated
+        - infraction
+        - card_declined
+        - sale_lost
+        - cart_abandoned
+        - product_canceled

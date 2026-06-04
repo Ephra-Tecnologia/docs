@@ -1,0 +1,10 @@
+---
+title: "Consultar transação"
+openapi: "GET /v1/transactions/{transactionId}"
+---
+
+Retorna o status e os detalhes de uma transação pelo seu `id`. Útil para reconciliação ou como fallback do webhook.
+
+<Tip>
+  Para saber quando uma transação é paga, prefira sempre o [webhook](/webhooks/visao-geral). Evite polling agressivo.
+</Tip>

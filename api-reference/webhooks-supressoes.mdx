@@ -1,0 +1,10 @@
+---
+title: "Suprimir webhooks"
+openapi: "POST /v1/webhook/suppressions"
+---
+
+Cria uma regra de **supressão** (anti-flood): suprime `suppressCount` entregas de um evento a cada `interval`. Útil em cenários de altíssimo volume.
+
+<Info>
+  Existem também as rotas `GET`, `PUT` e `DELETE` em `/v1/webhook/suppressions` para listar, atualizar e remover regras.
+</Info>

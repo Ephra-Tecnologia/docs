@@ -1,6 +1,7 @@
 ---
 title: "Pagamentos no cartão"
 description: "Como cobrar no cartão com segurança: tokenização, parcelas e tratamento de recusas."
+icon: "credit-card"
 ---
 
 A cobrança no cartão tem **dois passos**, e essa separação existe por segurança: os dados sensíveis do cartão nunca passam pela rota de cobrança.
@@ -36,6 +37,6 @@ Diferente do PIX (que sempre nasce `pending`), o cartão costuma **resolver de i
 
 O campo `refuseReason` diz o motivo (saldo insuficiente, cartão bloqueado, antifraude, etc.) e o campo `message` já vem traduzido para exibir ao usuário. Trate a recusa oferecendo outro cartão ou o PIX como alternativa.
 
-<Card title="Referência: rotas de cartão" icon="code" href="/api-reference/cartao">
+<Card title="Referência: rotas de cartão" icon="code" href="/api-reference/cartao-cobranca">
   Tokenização, cobrança, parcelas e a tabela completa de motivos de recusa.
 </Card>
